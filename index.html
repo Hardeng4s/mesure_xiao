@@ -1,1 +1,71 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mesures XIAO BLE</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; }
+    .card { border: 1px solid #ddd; border-radius: 14px; padding: 20px; }
+    .value { font-size: 2rem; margin: 12px 0; }
+    button { padding: 12px 18px; font-size: 1rem; cursor: pointer; }
+    pre { background: #f6f6f6; padding: 12px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Mesures en direct</h1>
+  <div class="card">
+    <button id="connectBtn">Connexion Bluetooth</button>
+    <div class="value">Tension : <span id="u">--</span> V</div>
+    <div class="value">Courant : <span id="i">--</span> A</div>
+    <pre id="raw">Aucune donnée</pre>
+  </div>
 
+  <script>
+    const SERVICE_UUID = "12345678-1234-1234-1234-1234567890ab";
+    const CHARACTERISTIC_UUID = "abcd1234-5678-90ab-cdef-1234567890ab";
+
+    const btn = document.getElementById("connectBtn");
+    const uEl = document.getElementById("u");
+    const iEl = document.getElementById("i");
+    const rawEl = document.getElementById("raw");
+
+    let characteristic;
+
+    function handleNotification(event) {
+      const value = new TextDecoder().decode(event.target.value);
+      rawEl.textContent = value;
+
+      try {
+        const data = JSON.parse(value);
+        uEl.textContent = data.U.toFixed(2);
+        iEl.textContent = data.I.toFixed(2);
+      } catch (e) {
+        console.error("JSON invalide :", e);
+      }
+    }
+
+    async function connectBLE() {
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: "XIAO" }],
+        optionalServices: [SERVICE_UUID]
+      });
+
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+      await characteristic.startNotifications();
+      characteristic.addEventListener("characteristicvaluechanged", handleNotification);
+    }
+
+    btn.addEventListener("click", async () => {
+      try {
+        await connectBLE();
+      } catch (err) {
+        console.error(err);
+        alert("Connexion Bluetooth impossible.");
+      }
+    });
+  </script>
+</body>
+</html>
